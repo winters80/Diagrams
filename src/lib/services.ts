@@ -57,6 +57,16 @@ export const SERVICES: Record<string, ServiceMeta> = {
   "azure.app_insights": { displayName: "Application Insights", icon: "/icons/azure/app_insights.svg", category: "Management" },
   "azure.openai": { displayName: "Azure OpenAI Service", icon: "/icons/azure/openai.svg", category: "AI" },
 
+  // Power Platform
+  "powerplatform.power_apps": { displayName: "Power Apps", icon: "/icons/powerplatform/power_apps.svg", category: "Power Platform" },
+  "powerplatform.power_automate": { displayName: "Power Automate", icon: "/icons/powerplatform/power_automate.svg", category: "Power Platform" },
+  "powerplatform.power_bi": { displayName: "Power BI", icon: "/icons/powerplatform/power_bi.svg", category: "Power Platform" },
+  "powerplatform.power_pages": { displayName: "Power Pages", icon: "/icons/powerplatform/power_pages.svg", category: "Power Platform" },
+  "powerplatform.copilot_studio": { displayName: "Copilot Studio", icon: "/icons/powerplatform/copilot_studio.svg", category: "Power Platform" },
+  "powerplatform.dataverse": { displayName: "Dataverse", icon: "/icons/powerplatform/dataverse.svg", category: "Power Platform" },
+  "powerplatform.ai_builder": { displayName: "AI Builder", icon: "/icons/powerplatform/ai_builder.svg", category: "Power Platform" },
+  "powerplatform.connectors": { displayName: "Connectors", icon: "/icons/powerplatform/connectors.svg", category: "Power Platform" },
+
   // Generic actors / external systems (no vendor logo, per WAF guidance)
   "generic.user": { displayName: "User", icon: "/icons/azure/generic_user.svg", category: "Generic" },
   "generic.external": { displayName: "External System", icon: "/icons/azure/generic_external.svg", category: "Generic" },

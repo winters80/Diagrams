@@ -1,25 +1,52 @@
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * Simple site-wide password gate (HTTP Basic Auth).
+ * Site-wide password gate (HTTP Basic Auth) supporting multiple accounts.
  *
- * Set SITE_USER and SITE_PASSWORD as environment variables to turn it on.
- * If either is unset (e.g. local dev), the gate is disabled and the site is open.
+ * Configure via environment variables:
+ *   SITE_USER + SITE_PASSWORD   — a single (admin) account.
+ *   SITE_USERS                  — additional accounts, comma-separated
+ *                                 "user:pass" pairs, e.g.
+ *                                 "guest:lookaround,leon:s3cret".
  *
- * This gates EVERYTHING — including the /api/generate route — so nobody can
- * spend your Claude credits without the password.
+ * You can use either or both. If NONE are set (e.g. local dev) the gate is off.
+ * Passwords may contain colons but not commas (comma separates accounts).
+ *
+ * This gates EVERYTHING — including /api/generate — so nobody can spend your
+ * Claude credits without a valid login.
  */
 export const config = {
-  // Gate all routes except Next's build assets.
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
 
-export function middleware(req: NextRequest) {
-  const user = process.env.SITE_USER;
-  const pass = process.env.SITE_PASSWORD;
+function validCredentials(): Map<string, string> {
+  const users = new Map<string, string>();
 
-  // Not configured → don't gate (open, e.g. during local development).
-  if (!user || !pass) return NextResponse.next();
+  const singleUser = process.env.SITE_USER;
+  const singlePass = process.env.SITE_PASSWORD;
+  if (singleUser && singlePass) users.set(singleUser, singlePass);
+
+  const list = process.env.SITE_USERS;
+  if (list) {
+    for (const pair of list.split(",")) {
+      const trimmed = pair.trim();
+      if (!trimmed) continue;
+      const idx = trimmed.indexOf(":");
+      if (idx === -1) continue;
+      const u = trimmed.slice(0, idx).trim();
+      const p = trimmed.slice(idx + 1);
+      if (u) users.set(u, p);
+    }
+  }
+
+  return users;
+}
+
+export function middleware(req: NextRequest) {
+  const users = validCredentials();
+
+  // No credentials configured → don't gate.
+  if (users.size === 0) return NextResponse.next();
 
   const header = req.headers.get("authorization");
   if (header?.startsWith("Basic ")) {
@@ -28,7 +55,7 @@ export function middleware(req: NextRequest) {
       const sep = decoded.indexOf(":");
       const u = decoded.slice(0, sep);
       const p = decoded.slice(sep + 1);
-      if (u === user && p === pass) return NextResponse.next();
+      if (users.get(u) === p) return NextResponse.next();
     } catch {
       // fall through to 401
     }

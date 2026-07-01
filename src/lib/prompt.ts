@@ -54,7 +54,10 @@ If the user is amending a diagram that is provided, keep the existing structure,
 ids, groups, and metadata where possible; bump the version's minor number and
 update lastUpdated. Only change what the user asked for.
 
-# Valid Azure service catalog (use these keys verbatim for "service")
+# Valid service catalog (use these keys verbatim for "service")
+Azure and Microsoft Power Platform services are available. Use the Power
+Platform keys (powerplatform.*) when the request describes a Power Platform
+solution (Power Apps, Power Automate flows, Dataverse, Copilot Studio, etc.).
 ${serviceCatalogForPrompt()}`;
 }
 
