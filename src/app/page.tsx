@@ -14,11 +14,22 @@ import {
   slugify,
 } from "@/lib/export";
 
+interface Usage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+  model: string;
+  estimatedCostUsd: number | null;
+}
+
 export default function Home() {
   const [set, setSet] = useState<DiagramSet | null>(null);
   const [active, setActive] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [usage, setUsage] = useState<Usage | null>(null);
+  const [totals, setTotals] = useState({ input: 0, output: 0, cost: 0, count: 0 });
 
   // Export targets for the active diagram.
   const canvasElRef = useRef<HTMLDivElement | null>(null);
@@ -39,8 +50,18 @@ export default function Home() {
           setError(data.error || "Generation failed.");
           return;
         }
-        setSet(data as DiagramSet);
+        const { usage: u, ...diagramSet } = data as DiagramSet & { usage?: Usage };
+        setSet(diagramSet as DiagramSet);
         setActive(0);
+        if (u) {
+          setUsage(u);
+          setTotals((t) => ({
+            input: t.input + u.inputTokens,
+            output: t.output + u.outputTokens,
+            cost: t.cost + (u.estimatedCostUsd ?? 0),
+            count: t.count + 1,
+          }));
+        }
       } catch (e) {
         setError(e instanceof Error ? e.message : "Network error.");
       } finally {
@@ -52,6 +73,10 @@ export default function Home() {
 
   const diagram = set?.diagrams[active] ?? null;
   const baseName = diagram ? slugify(diagram.metadata.title) : "diagram";
+
+  const fmt = (n: number) => n.toLocaleString();
+  const fmtCost = (n: number | null) =>
+    n == null ? "n/a" : n < 0.01 ? `<$0.01` : `$${n.toFixed(2)}`;
 
   const onPng = async () => {
     if (!diagram) return;
@@ -121,6 +146,23 @@ export default function Home() {
             </div>
           )}
         </div>
+
+        {/* Token usage / cost strip */}
+        {usage && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-gray-200 bg-gray-50 px-3 py-1.5 text-[11px] text-gray-600">
+            <span className="font-medium text-gray-700">Last generation:</span>
+            <span>{fmt(usage.inputTokens)} in</span>
+            <span>{fmt(usage.outputTokens)} out</span>
+            <span className="font-medium text-azure-dark">
+              ~{fmtCost(usage.estimatedCostUsd)}
+            </span>
+            <span className="text-gray-400">({usage.model})</span>
+            <span className="ml-auto text-gray-500">
+              Session: {totals.count} gen · {fmt(totals.input + totals.output)} tokens · ~
+              {fmtCost(totals.cost)}
+            </span>
+          </div>
+        )}
 
         {/* Canvas */}
         <div className="relative flex-1 bg-gray-50">

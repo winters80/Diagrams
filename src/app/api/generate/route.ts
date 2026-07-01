@@ -14,6 +14,36 @@ export const maxDuration = 60;
 
 const TOOL_NAME = "emit_diagrams";
 
+// Approximate list prices in USD per million tokens (input / output).
+// Cache reads bill ~0.1x input; cache writes ~1.25x input.
+const PRICING: Record<string, { in: number; out: number }> = {
+  "claude-opus-4-8": { in: 5, out: 25 },
+  "claude-opus-4-7": { in: 5, out: 25 },
+  "claude-opus-4-6": { in: 5, out: 25 },
+  "claude-sonnet-5": { in: 3, out: 15 },
+  "claude-sonnet-4-6": { in: 3, out: 15 },
+  "claude-haiku-4-5": { in: 1, out: 5 },
+};
+
+interface UsageTotals {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+}
+
+function estimateCostUsd(model: string, u: UsageTotals): number | null {
+  const p = PRICING[model];
+  if (!p) return null;
+  const cost =
+    (u.inputTokens * p.in +
+      u.outputTokens * p.out +
+      u.cacheReadTokens * p.in * 0.1 +
+      u.cacheCreationTokens * p.in * 1.25) /
+    1_000_000;
+  return Math.round(cost * 1e6) / 1e6;
+}
+
 // Build the tool input schema once from the zod model.
 const inputSchema = zodToJsonSchema(diagramSetSchema, {
   target: "openApi3",
@@ -112,6 +142,13 @@ export async function POST(req: NextRequest) {
     { role: "user", content: userContent },
   ];
 
+  const usage: UsageTotals = {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
+  };
+
   try {
     // Up to two attempts: one repair round-trip if zod validation fails.
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -124,11 +161,24 @@ export async function POST(req: NextRequest) {
         messages,
       });
 
+      // Accumulate token usage across all attempts in this generation.
+      usage.inputTokens += response.usage.input_tokens;
+      usage.outputTokens += response.usage.output_tokens;
+      usage.cacheReadTokens += response.usage.cache_read_input_tokens ?? 0;
+      usage.cacheCreationTokens += response.usage.cache_creation_input_tokens ?? 0;
+
       const raw = extractToolInput(response);
       const parsed = diagramSetSchema.safeParse(raw);
 
       if (parsed.success) {
-        return NextResponse.json(sanitize(parsed.data));
+        return NextResponse.json({
+          ...sanitize(parsed.data),
+          usage: {
+            ...usage,
+            model: DIAGRAM_MODEL,
+            estimatedCostUsd: estimateCostUsd(DIAGRAM_MODEL, usage),
+          },
+        });
       }
 
       // Feed the validation error back for one repair attempt.
